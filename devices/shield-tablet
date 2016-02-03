@@ -1,0 +1,86 @@
+#####################################################
+# Create Shield Kernel
+#####################################################
+f_shield_kernel(){
+
+echo "Downloading Android Toolchian"
+if [[ $LOCALGIT == 1 ]]; then
+	echo "Copying toolchain to rootfs"
+        cp -rf ${basepwd}/gcc-arm-linux-gnueabihf-4.7 ${basedir}/toolchain
+else
+	git clone https://github.com/offensive-security/gcc-arm-linux-gnueabihf-4.7 ${basedir}/toolchain
+fi
+
+echo "Setting export paths"
+# Set path for Kernel building
+export ARCH=arm
+export SUBARCH=arm
+export CROSS_COMPILE=${basedir}/toolchain/bin/arm-linux-gnueabihf-
+
+if [[ $FROZENKERNEL == 1 ]]; then
+	echo "Using frozen kernel"
+ 	cp -rf ${basepwd}/flash/ ${basedir}/flashkernel
+	rm -rf ${basedir}/flashkernel/data ${basedir}/flashkernel/sdcard ${basedir}/flashkernel/system/app ${basedir}/flashkernel/META-INF/com/google/android/updater-script
+  	cp -rf ${basepwd}/devices/frozen_kernels/5.1.1/shield-tablet/* ${basedir}/flashkernel/
+  	if [ -f "${basedir}/flash/META-INF/com/google/android/updater-script" ]; then
+	  if grep -Fxq "#KERNEL_SCRIPT_START" "${basedir}/flash/META-INF/com/google/android/updater-script"
+	  then
+	    echo "Kernel already added to main updater-script"
+	  else
+	    echo "Adding Kernel install to updater-script in main update.zip"
+	    cat ${basedir}/flashkernel/META-INF/com/google/android/updater-script >> ${basedir}/flash/META-INF/com/google/android/updater-script
+	    cp -f ${basedir}/flashkernel/kernel/kernel ${basedir}/flash/kernel/kernel
+	  fi
+	fi
+else
+
+f_kernel_build_init
+
+echo "Downloading Kernel"
+if [[ $LOCALGIT == 1 ]]; then
+  echo "Copying kernel to rootfs"
+  cp -rf ${basepwd}/shield-tablet-kernel ${basedir}/kernel
+else
+  git clone https://github.com/SuperPichu/shield-tablet-kernel.git -b master ${basedir}/kernel
+fi
+cd ${basedir}/kernel
+
+make clean
+sleep 10
+make kali_defconfig
+
+# Attach kernel builder to updater-script
+echo "#KERNEL_SCRIPT_START" >> ${basedir}/flashkernel/META-INF/com/google/android/updater-script
+cat << EOF > ${basedir}/flashkernel/META-INF/com/google/android/updater-script
+assert(getprop("ro.product.device") == "shieldtablet" || getprop("ro.build.product") == "shieldtablet");
+
+ui_print("* Starting Kernel install for Shield...     *");
+ui_print("* Mounting System...                        *");
+mount("ext4", "EMMC", "/dev/block/platform/sdhci-tegra.3/by-name/UDA", "/system");
+package_extract_dir("system", "/system");
+set_perm_recursive(0, 0, 0644, 0644, "/system/lib/modules");
+set_perm_recursive(0, 2000, 0755, 0755, "/system/bin");
+set_perm_recursive(0, 2000, 0755, 0755, "/system/xbin");
+set_perm_recursive(0, 0, 0755, 0755, "/system/etc/init.d");
+package_extract_dir("kernel", "/tmp");
+set_perm(0, 0, 0755, "/tmp/cleansystem.sh");
+ui_print("* Cleaning /system/app...                   *");
+run_program("/tmp/cleansystem.sh");
+ui_print("* Installing Kernel...                      *");
+package_extract_file("boot.img", "/dev/block/platform/sdhci-tegra.3/by-name/LNX");
+unmount("/system");
+ui_print("* Kernel installation completed...          *");
+EOF
+
+f_kernel_build
+
+cd ${basedir}/flashkernel/kernel
+abootimg --create ${basedir}/flashkernel/boot.img -f ${basedir}/kernel/ramdisk/5.1.1/bootimg.cfg -k ${basedir}/kernel/arch/arm/boot/zImage -r ${basedir}/kernel/ramdisk/5.1.1/initrd.img
+cd ${basedir}
+
+if [ -d "${basedir}/flash/" ]; then
+  cp ${basedir}/flashkernel/boot.img ${basedir}/flash/boot.img
+fi
+
+fi
+}
