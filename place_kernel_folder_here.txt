@@ -1,0 +1,2 @@
+kernel folder name needs to specified in scripts
+original name for shield - "shield-tablet-kernel"
