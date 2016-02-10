@@ -3,11 +3,11 @@
 # Kernel Development requires Kali 64bit host
 
 # can download intended rom for shield with...
-# git clone https://github.com/CM-shield/android_device_nvidia_shieldtablet
+# git clone https://github.com/cyanogenmod/android_device_nvidia_shieldtablet
 
 # Configure the build environment
 DEBUG=0    # Valid values are 0 or 1, with 1 being enabled
-LOCALGIT=1
+LOCALGIT=0
 FROZENKERNEL=1
 
 ######### Dependencies #######
@@ -18,7 +18,7 @@ FROZENKERNEL=1
 ##########  Compiler ###########
 # cd ~
 # git clone https://github.com/offensive-security/gcc-arm-linux-gnueabihf-4.7.git
-# export PATH=${PATH}:/root/gcc-arm-linux-gnueabihf-4.7/bin
+# export PATH=${PATH}:`pwd`/gcc-arm-linux-gnueabihf-4.7/bin
 ######### Local git repos  #######
 # When testing multiple images, it is often faster to first checkout git repos and use them locally.
 # To do this, you can :
@@ -165,14 +165,14 @@ f_check_crosscompile(){
 # anything else, that way the builds don't fail half way through.
 
 case $ccc in
-  1) export PATH=${PATH}:/root/arm-stuff/gcc-arm-linux-gnueabihf-4.7/bin; unset CROSS_COMPILE;;
+  1) export PATH=${PATH}:`pwd`/gcc-arm-linux-gnueabihf-4.7/bin; unset CROSS_COMPILE;;
   *)
     export CROSS_COMPILE=arm-linux-gnueabihf-
     if [ $(compgen -c $CROSS_COMPILE | wc -l) -eq 0 ] ; then
       echo "Missing cross compiler for Android root filesystem."
       echo "Set up PATH according to the README"
       echo ""
-      read -p "Enter export path (probable path): " -e -i "export PATH=${PATH}:/root/arm-stuff/gcc-arm-linux-gnueabihf-4.7/bin" EXPORT_PATH
+      read -p "Enter export path (probable path): " -e -i "export PATH=${PATH}:`pwd`/gcc-arm-linux-gnueabihf-4.7/bin" EXPORT_PATH
       $EXPORT_PATH
       unset CROSS_COMPILE
     else
